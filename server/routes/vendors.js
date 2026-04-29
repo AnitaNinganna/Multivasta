@@ -4,6 +4,7 @@ const Vendor = require('../models/Vendor');
 const User = require('../models/User');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
+const Category = require('../models/Category');
 const { authenticate, requireVendor, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
@@ -13,27 +14,6 @@ router.get('/', async (req, res) => {
   try {
     const vendors = await Vendor.find({ isApproved: true, isActive: true }).populate('userId', 'name email phone');
     res.json({ vendors });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get vendor public profile
-router.get('/:id', async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    if (!mongoose.isValidObjectId(id)) {
-      return res.status(404).json({ error: 'Vendor not found' });
-    }
-
-    const vendor = await Vendor.findOne({ _id: id, isApproved: true, isActive: true }).populate('userId', 'name');
-    if (!vendor) {
-      return res.status(404).json({ error: 'Vendor not found' });
-    }
-
-    const products = await Product.find({ vendorId: vendor._id, isActive: true, isApproved: true }).select('name price images quantity');
-    res.json({ vendor, products });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -84,6 +64,105 @@ router.get('/dashboard/stats', authenticate, requireVendor, async (req, res) => 
   }
 });
 
+// Vendor dashboard overview
+router.get('/dashboard', authenticate, requireVendor, async (req, res) => {
+  try {
+    const vendor = await Vendor.findOne({ userId: req.userId }).populate('userId', 'name email phone');
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+
+    const products = await Product.find({ vendorId: vendor._id })
+      .sort({ createdAt: -1 })
+      .select('name price quantity isActive isApproved createdAt');
+
+    const totalProducts = products.length;
+    const outOfStock = products.filter(p => p.quantity === 0).length;
+
+    const orders = await Order.find({ 'products.vendorId': vendor._id })
+      .populate('userId', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    const totalOrders = await Order.countDocuments({ 'products.vendorId': vendor._id });
+    const totalSales = orders.reduce((sum, order) => {
+      const vendorItems = order.products.filter(item => item.vendorId.toString() === vendor._id.toString());
+      return sum + vendorItems.reduce((itemSum, item) => itemSum + item.totalPrice, 0);
+    }, 0);
+
+    const dashboard = {
+      vendor,
+      stats: {
+        total_products: totalProducts,
+        out_of_stock: outOfStock,
+        total_orders: totalOrders,
+        recent_sales: totalSales
+      },
+      products,
+      recent_orders: orders.map(order => ({
+        order_id: order._id,
+        order_number: order.orderNumber,
+        customer_name: order.userId?.name || 'Customer',
+        total: order.products
+          .filter(item => item.vendorId.toString() === vendor._id.toString())
+          .reduce((sum, item) => sum + item.totalPrice, 0),
+        status: order.status,
+        createdAt: order.createdAt
+      }))
+    };
+
+    res.json(dashboard);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create vendor product (dashboard)
+router.post('/dashboard/products', authenticate, requireVendor, async (req, res) => {
+  const { name, description, price, sku, quantity = 0, images = [], attributes = {}, category_id } = req.body;
+
+  if (!name || price === undefined) {
+    return res.status(400).json({ error: 'Product name and price are required' });
+  }
+
+  try {
+    const vendor = await Vendor.findOne({ userId: req.userId });
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+
+    let categoryId = null;
+    if (category_id) {
+      if (!mongoose.isValidObjectId(category_id)) {
+        return res.status(400).json({ error: 'Invalid category ID' });
+      }
+      const category = await Category.findById(category_id);
+      if (!category) {
+        return res.status(400).json({ error: 'Category not found' });
+      }
+      categoryId = category._id;
+    }
+
+    const product = new Product({
+      vendorId: vendor._id,
+      name,
+      description: description || '',
+      price,
+      sku: sku || '',
+      quantity,
+      images: Array.isArray(images) ? images : [],
+      attributes,
+      categoryId,
+      isApproved: false
+    });
+
+    await product.save();
+    res.status(201).json({ message: 'Product created successfully', product_id: product._id, requires_approval: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Update vendor profile
 router.put('/profile', authenticate, requireVendor, async (req, res) => {
   const { store_name, store_description, store_logo, bank_account } = req.body;
@@ -106,6 +185,27 @@ router.put('/profile', authenticate, requireVendor, async (req, res) => {
 
     await Vendor.updateOne({ _id: vendor._id }, { $set: updates });
     res.json({ message: 'Profile updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get vendor public profile
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+
+    const vendor = await Vendor.findOne({ _id: id, isApproved: true, isActive: true }).populate('userId', 'name');
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+
+    const products = await Product.find({ vendorId: vendor._id, isActive: true, isApproved: true }).select('name price images quantity');
+    res.json({ vendor, products });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
