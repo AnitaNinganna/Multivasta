@@ -1,4 +1,7 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Vendor = require('../models/Vendor');
@@ -6,6 +9,31 @@ const Category = require('../models/Category');
 const { authenticate, requireVendor, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
+
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const timestamp = Date.now();
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    cb(null, `${timestamp}-${safeName}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed'), false);
+    }
+    cb(null, true);
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
 
 // Get all products (public)
 router.get('/', async (req, res) => {
@@ -47,7 +75,50 @@ router.get('/', async (req, res) => {
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
 
-    res.json({ products, page: Number(page), limit: Number(limit) });
+    const total = await Product.countDocuments(filter);
+    const totalPages = Math.ceil(total / Number(limit));
+
+    res.json({
+      products,
+      meta: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        total_pages: totalPages
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Upload product images (vendor only)
+router.post('/upload', authenticate, requireVendor, upload.array('images', 6), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No images uploaded' });
+    }
+
+    const uploadedUrls = req.files.map(file => `${req.protocol}://${req.get('host')}/uploads/${encodeURIComponent(file.filename)}`);
+    res.status(201).json({ message: 'Images uploaded successfully', images: uploadedUrls });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get current vendor products (vendor only)
+router.get('/mine', authenticate, requireVendor, async (req, res) => {
+  try {
+    const vendor = await Vendor.findOne({ userId: req.userId });
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor profile not found' });
+    }
+
+    const products = await Product.find({ vendorId: vendor._id })
+      .populate('categoryId', 'name')
+      .sort({ createdAt: -1 });
+
+    res.json({ products });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
