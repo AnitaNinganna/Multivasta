@@ -57,7 +57,20 @@ router.get('/', async (req, res) => {
 
     if (search) {
       const regex = new RegExp(search, 'i');
-      filter.$or = [{ name: regex }, { description: regex }];
+      const matchingCategories = await Category.find({ name: regex }).select('_id');
+      const matchingVendors = await Vendor.find({ storeName: regex }).select('_id');
+
+      filter.$or = [
+        { name: regex },
+        { description: regex }
+      ];
+
+      if (matchingCategories.length) {
+        filter.$or.push({ categoryId: { $in: matchingCategories.map((item) => item._id) } });
+      }
+      if (matchingVendors.length) {
+        filter.$or.push({ vendorId: { $in: matchingVendors.map((item) => item._id) } });
+      }
     }
 
     if (min_price !== undefined) {
@@ -133,7 +146,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const product = await Product.findById(id)
+    const product = await Product.findOne({ _id: id, isActive: true, isApproved: true })
       .populate('vendorId', 'storeName commissionRate')
       .populate('categoryId', 'name');
 

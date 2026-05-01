@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchProducts, checkHealth } from './api';
+import { fetchProducts, fetchProductDetails, checkHealth } from './api';
 import ProductCard from './components/ProductCard';
 import ProductModal from './components/ProductModal';
 
@@ -7,6 +7,7 @@ function App() {
   const [products, setProducts] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [productLoading, setProductLoading] = useState(false);
   const [error, setError] = useState('');
   const [health, setHealth] = useState('Waiting for backend...');
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -20,13 +21,20 @@ function App() {
 
   const clearMessage = () => setTimeout(() => setError(''), 4000);
 
+  const handleRefresh = async () => {
+    setQuery('');
+    setSelectedCategory('All');
+    setSelectedVendor('All');
+    await loadProducts();
+  };
+
   const loadProducts = async (searchTerm = '') => {
     setLoading(true);
     setError('');
 
     try {
-      const data = await fetchProducts(searchTerm);
-      setProducts(data);
+      const products = await fetchProducts(searchTerm);
+      setProducts(products);
     } catch (err) {
       setError(err.message || 'Unable to load products');
       clearMessage();
@@ -72,6 +80,22 @@ function App() {
     loadProducts(query.trim());
     setSelectedCategory('All');
     setSelectedVendor('All');
+  };
+
+  const handleViewProduct = async (productId) => {
+    setSelectedProduct(null);
+    setProductLoading(true);
+    setError('');
+
+    try {
+      const product = await fetchProductDetails(productId);
+      setSelectedProduct(product);
+    } catch (err) {
+      setError(err.message || 'Unable to load product details');
+      clearMessage();
+    } finally {
+      setProductLoading(false);
+    }
   };
 
   const clearFilters = () => {
@@ -135,6 +159,9 @@ function App() {
               <span>{filteredProducts.length}</span>
               <small>matching products</small>
             </div>
+            <button type="button" className="button button-secondary" onClick={handleRefresh}>
+              Reload products
+            </button>
           </div>
         </div>
       </section>
@@ -194,13 +221,12 @@ function App() {
 
         <div className="product-grid">
           {filteredProducts.map((product) => (
-            <ProductCard key={product._id} product={product} onView={setSelectedProduct} />
-          ))}
-        </div>
-      </main>
+              <ProductCard key={product._id} product={product} onView={() => handleViewProduct(product._id)} />
+            ))}
+          </div>
+        </main>
 
-      {selectedProduct && <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />}
-    </div>
+        {productLoading && <div className="message message-loading">Loading product details…</div>}
   );
 }
 

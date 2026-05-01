@@ -15,6 +15,16 @@ export async function fetchProducts(search = '') {
   return data.products || [];
 }
 
+export async function fetchProductDetails(productId) {
+  const response = await fetch(`${API_BASE}/products/${encodeURIComponent(productId)}`);
+  if (!response.ok) {
+    throw new Error(`Failed to load product details (${response.status})`);
+  }
+
+  const data = await response.json();
+  return data.product || null;
+}
+
 export async function checkHealth() {
   const response = await fetch(`${API_BASE}/health`);
   const data = await response.json();

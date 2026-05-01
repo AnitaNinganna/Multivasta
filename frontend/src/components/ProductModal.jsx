@@ -1,6 +1,18 @@
+import { useEffect } from 'react';
 import './ProductModal.css';
 
 export default function ProductModal({ product, onClose }) {
+  useEffect(() => {
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
   if (!product) {
     return null;
   }
@@ -28,7 +40,11 @@ export default function ProductModal({ product, onClose }) {
 
         <div className="modal-body">
           <div className="modal-image">
-            <span>{product.images?.length ? 'Product image preview' : 'No image available'}</span>
+            {product.images?.length ? (
+              <img src={product.images[0]} alt={product.name} />
+            ) : (
+              <span>No image available</span>
+            )}
           </div>
           <div className="modal-details">
             <p className="modal-description">{product.description || 'No description provided for this product.'}</p>

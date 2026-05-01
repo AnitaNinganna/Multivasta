@@ -1,8 +1,14 @@
 export default function ProductCard({ product, onView }) {
+  const coverImage = product.images?.length ? product.images[0] : null;
+
   return (
     <article className="product-card">
       <div className="product-image">
-        <span>{product.images?.length ? 'Image available' : 'No image'}</span>
+        {coverImage ? (
+          <img src={coverImage} alt={product.name} />
+        ) : (
+          <span>No image</span>
+        )}
       </div>
       <div className="product-details">
         <div className="card-heading">

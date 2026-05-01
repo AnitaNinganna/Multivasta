@@ -33,9 +33,13 @@ app.use('/api/vendors', vendorRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reviews', reviewRoutes);
 
-// Health check endpoint
+// Health check endpoints
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Multi-Vasta API is running', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/test', (req, res) => {
+  res.json({ status: 'OK', message: 'API test route is available', timestamp: new Date().toISOString() });
 });
 
 // Fallback for unknown API routes
