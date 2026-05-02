@@ -4,6 +4,14 @@ const User = require('../models/User');
 const Vendor = require('../models/Vendor');
 const { JWT_SECRET } = require('../middleware/auth');
 
+const buildVendorDetails = ({ store_name, store_description }) => ({
+  storeName: store_name || '',
+  storeDescription: store_description || '',
+  commissionRate: 10.0,
+  isApproved: false,
+  isActive: true,
+});
+
 // Register
 exports.register = async (req, res) => {
   try {
@@ -25,22 +33,27 @@ exports.register = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({
+    const userPayload = {
       name: displayName,
       email,
       password: hashedPassword,
       role: userRole,
       phone: phone || '',
-      address: address || ''
-    });
+      address: address || '',
+    };
 
+    if (userRole === 'vendor') {
+      userPayload.vendorDetails = buildVendorDetails({ store_name, store_description });
+    }
+
+    const user = new User(userPayload);
     const savedUser = await user.save();
 
     if (userRole === 'vendor') {
       const vendor = new Vendor({
         userId: savedUser._id,
-        storeName: store_name || `${displayName} Store`,
-        storeDescription: store_description || ''
+        storeName: savedUser.vendorDetails.storeName || `${displayName} Store`,
+        storeDescription: savedUser.vendorDetails.storeDescription || ''
       });
       await vendor.save();
     }
@@ -60,7 +73,7 @@ exports.login = async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select('+password');
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -69,6 +82,9 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    user.lastLogin = new Date();
+    await user.save();
 
     generateTokenAndRespond(user, res, 200);
   } catch (error) {
@@ -96,9 +112,16 @@ exports.getProfile = async (req, res) => {
 
 function generateTokenAndRespond(user, res, statusCode) {
   const token = jwt.sign({ userId: user._id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+
   res.status(statusCode).json({
     message: 'Authentication successful',
     token,
-    user: { id: user._id, email: user.email, name: user.name, role: user.role }
+    user: {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      vendorDetails: user.vendorDetails || null,
+    }
   });
 }

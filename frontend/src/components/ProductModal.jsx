@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import './ProductModal.css';
 
-export default function ProductModal({ product, onClose }) {
+export default function ProductModal({ product, onClose, onAddToCart }) {
   useEffect(() => {
     const handleEscape = (event) => {
       if (event.key === 'Escape') {
@@ -73,6 +73,15 @@ export default function ProductModal({ product, onClose }) {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="modal-footer">
+          <button type="button" className="button button-secondary" onClick={onClose}>
+            Close
+          </button>
+          <button type="button" className="button button-primary" onClick={onAddToCart}>
+            Add to cart
+          </button>
         </div>
       </div>
     </div>

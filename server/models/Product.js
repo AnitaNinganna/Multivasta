@@ -4,7 +4,7 @@ const ProductSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
   price: { type: Number, required: true, min: 0 },
-  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
   images: { type: [String], default: [] },
   attributes: { type: mongoose.Schema.Types.Mixed, default: {} },

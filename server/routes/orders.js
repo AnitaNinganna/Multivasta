@@ -139,12 +139,12 @@ router.get('/vendor/orders', authenticate, requireVendor, async (req, res) => {
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
-    const orders = await Order.find({ 'products.vendorId': vendor._id })
+    const orders = await Order.find({ 'products.vendorId': req.userId })
       .populate('userId', 'name email')
       .sort({ createdAt: -1 });
 
     const formatted = orders.map(order => {
-      const vendorItems = order.products.filter(item => item.vendorId.toString() === vendor._id.toString());
+      const vendorItems = order.products.filter(item => item.vendorId.toString() === req.userId.toString());
       const total = vendorItems.reduce((sum, item) => sum + item.totalPrice, 0);
       return {
         order_id: order._id,

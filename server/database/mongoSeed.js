@@ -79,7 +79,7 @@ async function seed() {
     ];
 
     await Product.insertMany(productsData.map(product => ({
-      vendorId: vendorDocs[product.vendorIndex]._id,
+      vendorId: vendorUsers[product.vendorIndex]._id,
       categoryId: categoryDocs.find(cat => cat.slug === product.categorySlug)._id,
       name: product.name,
       description: `High-quality ${product.name} from our store.`,

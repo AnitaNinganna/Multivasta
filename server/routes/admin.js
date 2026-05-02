@@ -74,7 +74,8 @@ router.get('/pending-vendors', authenticate, requireAdmin, async (req, res) => {
 // Get pending product approvals
 router.get('/pending-products', authenticate, requireAdmin, async (req, res) => {
   try {
-    const products = await Product.find({ isApproved: false }).populate('vendorId', 'storeName');
+    const products = await Product.find({ isApproved: false })
+      .populate('vendorId', 'name vendorDetails.storeName vendorDetails.commissionRate');
     res.json({ products });
   } catch (error) {
     res.status(500).json({ error: error.message });

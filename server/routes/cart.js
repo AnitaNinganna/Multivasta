@@ -11,7 +11,7 @@ router.get('/', authenticate, requireCustomer, async (req, res) => {
   try {
     const cart = await Cart.findOne({ userId: req.userId }).populate({
       path: 'items.productId',
-      populate: { path: 'vendorId', select: 'storeName' }
+      populate: { path: 'vendorId', select: 'name vendorDetails.storeName' }
     });
 
     const items = cart?.items || [];

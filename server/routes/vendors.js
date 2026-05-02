@@ -27,11 +27,11 @@ router.get('/dashboard/stats', authenticate, requireVendor, async (req, res) => 
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
-    const products = await Product.find({ vendorId: vendor._id });
+    const products = await Product.find({ vendorId: req.userId });
     const totalProducts = products.length;
     const outOfStock = products.filter(p => p.quantity === 0).length;
 
-    const orders = await Order.find({ 'products.vendorId': vendor._id }).populate('userId', 'name');
+    const orders = await Order.find({ 'products.vendorId': req.userId }).populate('userId', 'name');
     const totalOrders = orders.length;
 
     let totalSales = 0;
@@ -39,7 +39,7 @@ router.get('/dashboard/stats', authenticate, requireVendor, async (req, res) => 
 
     const recentOrders = orders
       .map(order => {
-        const vendorItems = order.products.filter(item => item.vendorId.toString() === vendor._id.toString());
+        const vendorItems = order.products.filter(item => item.vendorId.toString() === req.userId.toString());
         const vendorTotal = vendorItems.reduce((sum, item) => sum + item.totalPrice, 0);
         totalSales += vendorTotal;
         totalEarnings += vendorTotal * ((100 - vendor.commissionRate) / 100);
@@ -72,21 +72,21 @@ router.get('/dashboard', authenticate, requireVendor, async (req, res) => {
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
-    const products = await Product.find({ vendorId: vendor._id })
+    const products = await Product.find({ vendorId: req.userId })
       .sort({ createdAt: -1 })
       .select('name price quantity isActive isApproved createdAt');
 
     const totalProducts = products.length;
     const outOfStock = products.filter(p => p.quantity === 0).length;
 
-    const orders = await Order.find({ 'products.vendorId': vendor._id })
+    const orders = await Order.find({ 'products.vendorId': req.userId })
       .populate('userId', 'name email')
       .sort({ createdAt: -1 })
       .limit(5);
 
-    const totalOrders = await Order.countDocuments({ 'products.vendorId': vendor._id });
+    const totalOrders = await Order.countDocuments({ 'products.vendorId': req.userId });
     const totalSales = orders.reduce((sum, order) => {
-      const vendorItems = order.products.filter(item => item.vendorId.toString() === vendor._id.toString());
+      const vendorItems = order.products.filter(item => item.vendorId.toString() === req.userId.toString());
       return sum + vendorItems.reduce((itemSum, item) => itemSum + item.totalPrice, 0);
     }, 0);
 
@@ -104,7 +104,7 @@ router.get('/dashboard', authenticate, requireVendor, async (req, res) => {
         order_number: order.orderNumber,
         customer_name: order.userId?.name || 'Customer',
         total: order.products
-          .filter(item => item.vendorId.toString() === vendor._id.toString())
+          .filter(item => item.vendorId.toString() === req.userId.toString())
           .reduce((sum, item) => sum + item.totalPrice, 0),
         status: order.status,
         createdAt: order.createdAt
@@ -144,7 +144,7 @@ router.post('/dashboard/products', authenticate, requireVendor, async (req, res)
     }
 
     const product = new Product({
-      vendorId: vendor._id,
+      vendorId: req.userId,
       name,
       description: description || '',
       price,
@@ -204,7 +204,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
-    const products = await Product.find({ vendorId: vendor._id, isActive: true, isApproved: true }).select('name price images quantity');
+    const products = await Product.find({ vendorId: vendor.userId, isActive: true, isApproved: true }).select('name price images quantity');
     res.json({ vendor, products });
   } catch (error) {
     res.status(500).json({ error: error.message });

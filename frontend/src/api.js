@@ -30,3 +30,37 @@ export async function checkHealth() {
   const data = await response.json();
   return data;
 }
+
+async function postJson(url, body) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || data.message || `Request failed (${response.status})`);
+  }
+
+  return data;
+}
+
+export async function loginUser(payload) {
+  return postJson(`${API_BASE}/auth/login`, payload);
+}
+
+export async function registerUser(payload) {
+  return postJson(`${API_BASE}/auth/register`, payload);
+}
+
+export async function fetchProfile(token) {
+  const response = await fetch(`${API_BASE}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || data.message || `Request failed (${response.status})`);
+  }
+  return data;
+}

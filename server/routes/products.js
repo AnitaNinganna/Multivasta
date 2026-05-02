@@ -52,13 +52,18 @@ router.get('/', async (req, res) => {
     }
 
     if (vendor && mongoose.isValidObjectId(vendor)) {
-      filter.vendorId = vendor;
+      const vendorDoc = await Vendor.findById(vendor);
+      if (vendorDoc) {
+        filter.vendorId = vendorDoc.userId;
+      } else {
+        filter.vendorId = vendor;
+      }
     }
 
     if (search) {
       const regex = new RegExp(search, 'i');
       const matchingCategories = await Category.find({ name: regex }).select('_id');
-      const matchingVendors = await Vendor.find({ storeName: regex }).select('_id');
+      const matchingVendorUsers = await Vendor.find({ storeName: regex }).select('userId');
 
       filter.$or = [
         { name: regex },
@@ -68,8 +73,8 @@ router.get('/', async (req, res) => {
       if (matchingCategories.length) {
         filter.$or.push({ categoryId: { $in: matchingCategories.map((item) => item._id) } });
       }
-      if (matchingVendors.length) {
-        filter.$or.push({ vendorId: { $in: matchingVendors.map((item) => item._id) } });
+      if (matchingVendorUsers.length) {
+        filter.$or.push({ vendorId: { $in: matchingVendorUsers.map((item) => item.userId) } });
       }
     }
 
@@ -82,7 +87,7 @@ router.get('/', async (req, res) => {
     }
 
     const products = await Product.find(filter)
-      .populate('vendorId', 'storeName')
+      .populate('vendorId', 'name vendorDetails.storeName vendorDetails.commissionRate')
       .populate('categoryId', 'name')
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
@@ -127,7 +132,7 @@ router.get('/mine', authenticate, requireVendor, async (req, res) => {
       return res.status(404).json({ error: 'Vendor profile not found' });
     }
 
-    const products = await Product.find({ vendorId: vendor._id })
+    const products = await Product.find({ vendorId: req.userId })
       .populate('categoryId', 'name')
       .sort({ createdAt: -1 });
 
@@ -147,7 +152,7 @@ router.get('/:id', async (req, res) => {
     }
 
     const product = await Product.findOne({ _id: id, isActive: true, isApproved: true })
-      .populate('vendorId', 'storeName commissionRate')
+      .populate('vendorId', 'name vendorDetails.storeName vendorDetails.commissionRate')
       .populate('categoryId', 'name');
 
     if (!product) {
@@ -177,7 +182,7 @@ router.post('/', authenticate, requireVendor, async (req, res) => {
     const categoryId = category_id && mongoose.isValidObjectId(category_id) ? category_id : null;
 
     const product = new Product({
-      vendorId: vendor._id,
+      vendorId: req.userId,
       name,
       description: description || '',
       price,
@@ -210,7 +215,7 @@ router.put('/:id', authenticate, requireVendor, async (req, res) => {
       return res.status(404).json({ error: 'Vendor profile not found' });
     }
 
-    const product = await Product.findOne({ _id: id, vendorId: vendor._id });
+    const product = await Product.findOne({ _id: id, vendorId: req.userId });
     if (!product) {
       return res.status(404).json({ error: 'Product not found or unauthorized' });
     }
@@ -259,7 +264,7 @@ router.delete('/:id', authenticate, requireVendor, async (req, res) => {
       return res.status(404).json({ error: 'Vendor profile not found' });
     }
 
-    const result = await Product.deleteOne({ _id: id, vendorId: vendor._id });
+    const result = await Product.deleteOne({ _id: id, vendorId: req.userId });
     if (result.deletedCount === 0) {
       return res.status(404).json({ error: 'Product not found or unauthorized' });
     }
