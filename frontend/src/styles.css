@@ -1021,6 +1021,22 @@ input {
   }
 }
 
+/* Missing component styles */
+.page-heading {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  color: #0f172a;
+}
+
+.button-small {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+.button-small:hover {
+  transform: scale(1.05);
+}
+
 @media (max-width: 720px) {
   .app-shell {
     padding: 18px;
@@ -1037,5 +1053,23 @@ input {
   .icon-stats,
   .modal-info-row {
     grid-template-columns: 1fr;
+  }
+
+  .site-header {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .site-search {
+    grid-template-columns: 1fr;
+  }
+
+  .site-nav {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .cart-drawer {
+    width: 100%;
   }
 }
