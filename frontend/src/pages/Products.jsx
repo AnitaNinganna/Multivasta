@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { fetchProducts, fetchProductDetails, checkHealth } from '../api';
 import { useCart } from '../CartContext';
+import { useNotification } from '../hooks/useNotification';
 import ProductCard from '../components/ProductCard';
 import ProductModal from '../components/ProductModal';
+import { SkeletonProductCard } from '../components/SkeletonLoader';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -20,6 +22,16 @@ export default function ProductsPage() {
   const { productId } = useParams();
   const navigate = useNavigate();
   const { addToCart, addRecentView } = useCart();
+  const { error: errorNotif, success } = useNotification();
+
+  const refreshHealth = async () => {
+    try {
+      const health = await checkHealth();
+      setHealth(health.status);
+    } catch (err) {
+      setHealth('Error');
+    }
+  };
 
   useEffect(() => {
     const initialSearch = searchParams.get('search') || '';
@@ -46,7 +58,9 @@ export default function ProductsPage() {
       const products = await fetchProducts(searchTerm);
       setProducts(products);
     } catch (err) {
-      setError(err.message || 'Unable to load products');
+      const message = err.message || 'Unable to load products';
+      setError(message);
+      errorNotif(message);
       clearMessage();
     } finally {
       setLoading(false);
@@ -61,7 +75,9 @@ export default function ProductsPage() {
       const product = await fetchProductDetails(id);
       setSelectedProduct(product);
     } catch (err) {
-      setError(err.message || 'Unable to load product details');
+      const message = err.message || 'Unable to load product details';
+      setError(message);
+      errorNotif(message);
       setSelectedProduct(null);
       clearMessage();
     } finally {
@@ -92,6 +108,11 @@ export default function ProductsPage() {
   const handleCloseProduct = () => {
     setSelectedProduct(null);
     navigate('/products');
+  };
+
+  const handleQuickAdd = (product) => {
+    addToCart(product);
+    success(`✓ Added ${product.name} to cart`);
   };
 
   const categories = useMemo(() => {
@@ -234,23 +255,39 @@ export default function ProductsPage() {
         </div>
 
         {error && <div className="message message-error">{error}</div>}
-        {loading && <div className="message message-loading">Loading products…</div>}
-        {!loading && filteredProducts.length === 0 && <div className="message">No products match the selected filters.</div>}
 
         <div className="product-grid">
-          {filteredProducts.map((product) => (
-            <ProductCard
-              key={product._id}
-              product={product}
-              onView={handleViewProduct}
-              onQuickAdd={(productToAdd) => addToCart(productToAdd)}
-            />
-          ))}
+          {loading ? (
+            // Show skeleton loaders while loading
+            Array.from({ length: 8 }).map((_, i) => (
+              <SkeletonProductCard key={i} />
+            ))
+          ) : filteredProducts.length === 0 ? (
+            <div className="message">No products match the selected filters.</div>
+          ) : (
+            // Show actual products
+            filteredProducts.map((product) => (
+              <ProductCard
+                key={product._id}
+                product={product}
+                onView={handleViewProduct}
+                onQuickAdd={handleQuickAdd}
+              />
+            ))
+          )}
         </div>
       </main>
 
-      {productLoading && <div className="message message-loading">Loading product details…</div>}
-      {selectedProduct && <ProductModal product={selectedProduct} onClose={handleCloseProduct} onAddToCart={() => addToCart(selectedProduct)} />}
+      {selectedProduct && (
+        <ProductModal
+          product={selectedProduct}
+          onClose={handleCloseProduct}
+          onAddToCart={(product, quantity) => {
+            addToCart(product, quantity);
+            success(`✓ Added to cart`);
+          }}
+        />
+      )}
     </div>
   );
 }

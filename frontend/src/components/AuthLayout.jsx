@@ -111,7 +111,7 @@ export default function AuthLayout({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 overflow-hidden">
+    <div className="auth-shell min-h-screen overflow-hidden">
       <div className="grid grid-cols-1 lg:grid-cols-2 h-screen">
         {/* LEFT SIDE - Branding (Hidden on mobile) */}
         <motion.div 
@@ -178,7 +178,6 @@ export default function AuthLayout({
               <div className="w-10 h-10 rounded-full bg-blue-300 opacity-70"></div>
               <div>
                 <p className="text-white font-semibold text-sm">Sarah Chen</p>
-                <p className="text-blue-100 text-xs">Marketplace Vendor</p>
               </div>
             </div>
           </motion.div>
@@ -197,7 +196,7 @@ export default function AuthLayout({
           >
             {/* Glassmorphism Card */}
             <motion.div 
-              className="relative backdrop-blur-md bg-white bg-opacity-95 rounded-2xl p-8 shadow-glass border border-white border-opacity-30"
+              className="relative backdrop-blur-md bg-slate-950/95 rounded-2xl p-8 shadow-[0_28px_80px_rgba(0,0,0,0.35)] border border-white/10"
               variants={itemVariants}
             >
               {/* Header */}
@@ -205,10 +204,10 @@ export default function AuthLayout({
                 <motion.p variants={itemVariants} className="text-xs font-semibold text-primary-600 uppercase tracking-widest">
                   {isLogin ? 'Sign In' : 'Create Account'}
                 </motion.p>
-                <motion.h2 variants={itemVariants} className="text-3xl font-bold text-slate-900 mt-2 mb-2">
+                <motion.h2 variants={itemVariants} className="text-3xl font-bold text-slate-50 mt-2 mb-2">
                   {isLogin ? 'Welcome back' : 'Get started'}
                 </motion.h2>
-                <motion.p variants={itemVariants} className="text-slate-600 text-sm">
+                <motion.p variants={itemVariants} className="text-slate-300 text-sm">
                   {isLogin 
                     ? 'Access your saved cart, orders, and marketplace dashboard.' 
                     : 'Choose your account type and join our global marketplace today.'}
@@ -239,7 +238,7 @@ export default function AuthLayout({
               {/* Role Selection (Signup only) */}
               {!isLogin && (
                 <motion.div variants={itemVariants} className="mb-6">
-                  <label className="block text-sm font-semibold text-slate-900 mb-3">Account type</label>
+                  <label className="block text-sm font-semibold text-slate-200 mb-3">Account type</label>
                   <div className="flex gap-3">
                     {['customer', 'vendor'].map(r => (
                       <button
@@ -249,7 +248,7 @@ export default function AuthLayout({
                         className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all ${
                           role === r
                             ? 'bg-primary-600 text-white shadow-md'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                         }`}
                       >
                         {r.charAt(0).toUpperCase() + r.slice(1)}
@@ -264,7 +263,7 @@ export default function AuthLayout({
                 {/* Name Field (Signup only) */}
                 {!isLogin && (
                   <motion.div variants={itemVariants} className="group">
-                    <label className="block text-sm font-semibold text-slate-900 mb-2">Full name</label>
+                    <label className="block text-sm font-semibold text-slate-200 mb-2">Full name</label>
                     <input
                       type="text"
                       name="name"
@@ -273,7 +272,7 @@ export default function AuthLayout({
                       placeholder="Sarah Chen"
                       autoComplete="name"
                       required={!isLogin}
-                      className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white text-slate-900 placeholder-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                      className="w-full px-4 py-3 rounded-lg border border-slate-700 bg-slate-950/80 text-slate-100 placeholder-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     />
                   </motion.div>
                 )}
@@ -281,15 +280,15 @@ export default function AuthLayout({
                 {/* Email Field */}
                 <motion.div variants={itemVariants} className="group">
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-semibold text-slate-900">Email address</label>
+                    <label className="text-sm font-semibold text-slate-200">Email address</label>
                     {formData.email && (
-                      <span className={`text-xs font-medium ${isEmailValid ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className={`text-xs font-medium ${isEmailValid ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {isEmailValid ? '✓ Valid' : '✗ Invalid'}
                       </span>
                     )}
                   </div>
                   <div className="relative">
-                    <Mail className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-primary-600 transition-colors" />
+                    <Mail className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-500 group-focus-within:text-primary-400 transition-colors" />
                     <input
                       type="email"
                       name="email"
@@ -298,12 +297,12 @@ export default function AuthLayout({
                       placeholder="name@company.com"
                       autoComplete="email"
                       required
-                      className={`w-full pl-11 pr-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent ${
-                        formData.email && (isEmailValid ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50')
-                      } ${!formData.email ? 'border-slate-200' : ''}`}
+                      className={`w-full pl-11 pr-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                        formData.email && (isEmailValid ? 'border-emerald-400 bg-emerald-950/80' : 'border-rose-400 bg-rose-950/80')
+                      } ${!formData.email ? 'border-slate-700 bg-slate-950/80' : ''} text-slate-100 placeholder-slate-500`}
                     />
                   </div>
-                  <p className="text-xs text-slate-500 mt-1.5">
+                  <p className="text-xs text-slate-400 mt-1.5">
                     {formData.email ? (isEmailValid ? 'Valid format' : 'Enter a valid email') : 'We use this to sign you in'}
                   </p>
                 </motion.div>
@@ -311,7 +310,7 @@ export default function AuthLayout({
                 {/* Password Field */}
                 <motion.div variants={itemVariants} className="group">
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-semibold text-slate-900">Password</label>
+                    <label className="text-sm font-semibold text-slate-200">Password</label>
                     <button
                       type="button"
                       onClick={() => setFormData(prev => ({ ...prev, showPassword: !prev.showPassword }))}
@@ -321,7 +320,7 @@ export default function AuthLayout({
                     </button>
                   </div>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-primary-600 transition-colors" />
+                    <Lock className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-500 group-focus-within:text-primary-400 transition-colors" />
                     <input
                       type={formData.showPassword ? 'text' : 'password'}
                       name="password"
@@ -330,7 +329,7 @@ export default function AuthLayout({
                       placeholder={isLogin ? '••••••••' : 'At least 8 characters'}
                       autoComplete={isLogin ? 'current-password' : 'new-password'}
                       required
-                      className="w-full pl-11 pr-4 py-3 rounded-lg border border-slate-200 bg-white text-slate-900 placeholder-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                      className="w-full pl-11 pr-4 py-3 rounded-lg border border-slate-700 bg-slate-950/80 text-slate-100 placeholder-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     />
                   </div>
 
@@ -372,7 +371,7 @@ export default function AuthLayout({
                     animate={{ opacity: 1, height: 'auto' }}
                     className="group"
                   >
-                    <label className="block text-sm font-semibold text-slate-900 mb-2">Store name</label>
+                    <label className="block text-sm font-semibold text-slate-200 mb-2">Store name</label>
                     <input
                       type="text"
                       name="storeName"
@@ -380,7 +379,7 @@ export default function AuthLayout({
                       onChange={handleInputChange}
                       placeholder="Your Store Name"
                       required={role === 'vendor'}
-                      className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white text-slate-900 placeholder-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                      className="w-full px-4 py-3 rounded-lg border border-slate-700 bg-slate-950/80 text-slate-100 placeholder-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     />
                   </motion.div>
                 )}
@@ -405,11 +404,11 @@ export default function AuthLayout({
                 </motion.button>
 
                 {/* Link to other page */}
-                <motion.p variants={itemVariants} className="text-center text-sm text-slate-600">
+                <motion.p variants={itemVariants} className="text-center text-sm text-slate-300">
                   {isLogin ? "Don't have an account? " : 'Already have an account? '}
                   <a 
                     href={isLogin ? '/signup' : '/login'} 
-                    className="text-primary-600 hover:text-primary-700 font-semibold"
+                    className="text-primary-300 hover:text-primary-200 font-semibold"
                   >
                     {isLogin ? 'Sign up' : 'Sign in'}
                   </a>
@@ -420,9 +419,9 @@ export default function AuthLayout({
               {isLogin && (
                 <motion.div 
                   variants={itemVariants}
-                  className="mt-6 pt-6 border-t border-slate-200 text-xs text-slate-500 space-y-1"
+                  className="mt-6 pt-6 border-t border-slate-800 text-xs text-slate-400 space-y-1"
                 >
-                  <p className="font-semibold text-slate-700 mb-2">Demo credentials:</p>
+                  <p className="font-semibold text-slate-200 mb-2">Demo credentials:</p>
                   <p>📧 john.doe@email.com / 🔑 customer123</p>
                   <p>👔 tech.store@email.com / 🔑 vendor123</p>
                 </motion.div>

@@ -155,37 +155,80 @@ router.patch('/orders/:id/status', authenticate, requireAdmin, async (req, res) 
   }
 });
 
-// Category management
-router.post('/categories', authenticate, requireAdmin, async (req, res) => {
-  const { name, slug, description, parent_id } = req.body;
-
-  if (!name || !slug) {
-    return res.status(400).json({ error: 'Name and slug are required' });
-  }
+// Delete user
+router.delete('/users/:id', authenticate, requireAdmin, async (req, res) => {
+  const { id } = req.params;
 
   try {
-    const category = new Category({
-      name,
-      slug: slug.toString().toLowerCase(),
-      description: description || '',
-      parentId: mongoose.isValidObjectId(parent_id) ? parent_id : null
-    });
-
-    await category.save();
-    res.status(201).json({ message: 'Category created', category_id: category._id });
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({ error: 'Category slug already exists' });
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(404).json({ error: 'User not found' });
     }
+
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
+// Approve product
+router.patch('/products/:id/approve', authenticate, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const product = await Product.findByIdAndUpdate(id, { isApproved: true }, { new: true });
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    res.json({ message: 'Product approved successfully', product });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all categories (public route, but moved here for consistency)
 router.get('/categories', authenticate, requireAdmin, async (req, res) => {
   try {
     const categories = await Category.find().sort({ name: 1 });
     res.json({ categories });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create category
+router.post('/categories', authenticate, requireAdmin, async (req, res) => {
+  const { name, slug, description, parent_id } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ error: 'Category name is required' });
+  }
+
+  try {
+    const category_slug = (slug || name).toString().toLowerCase().replace(/\s+/g, '-');
+    
+    const category = new Category({
+      name,
+      slug: category_slug,
+      description: description || '',
+      parentId: mongoose.isValidObjectId(parent_id) ? parent_id : null
+    });
+
+    await category.save();
+    res.status(201).json({ message: 'Category created', categoryId: category._id });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'Category slug already exists' });
+    }
     res.status(500).json({ error: error.message });
   }
 });

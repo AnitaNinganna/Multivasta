@@ -1,5 +1,7 @@
 export default function ProductCard({ product, onView, onQuickAdd }) {
   const coverImage = product.images?.length ? product.images[0] : null;
+  const vendorName = product.vendorId?.storeName || product.vendorId?.name || 'Marketplace seller';
+  const vendorRating = product.vendorId?.rating || 4.8;
 
   return (
     <article className="product-card">
@@ -17,17 +19,19 @@ export default function ProductCard({ product, onView, onQuickAdd }) {
             {product.quantity ? 'In stock' : 'Out of stock'}
           </span>
         </div>
-        {product.vendorId?.storeName && (
-          <div className="product-trust">
-            <span className="vendor-badge">Verified vendor</span>
-            <span>{product.vendorId.storeName}</span>
-          </div>
-        )}
-        <p>{product.description || 'No description available.'}</p>
-        <div className="product-meta">
-          <span>{product.categoryId?.name || 'Uncategorized'}</span>
-          <span>{product.vendorId?.storeName || 'Unknown seller'}</span>
+
+        <div className="product-trust">
+          <span className="vendor-badge">{vendorName}</span>
+          <span className="vendor-rating">⭐ {vendorRating.toFixed(1)}</span>
         </div>
+
+        <p>{product.description || 'No description available.'}</p>
+
+        <div className="product-meta">
+          <span className="meta-pill">{product.categoryId?.name || 'Uncategorized'}</span>
+          <span className="meta-pill">{vendorName}</span>
+        </div>
+
         <div className="product-cta">
           <strong>${product.price?.toFixed(2) ?? '0.00'}</strong>
           <div className="product-actions">

@@ -6,6 +6,7 @@ const CartContext = createContext({
   totalItems: 0,
   addToCart: () => {},
   removeFromCart: () => {},
+  updateQuantity: () => {},
   clearCart: () => {},
   addRecentView: () => {},
 });
@@ -38,17 +39,29 @@ export function CartProvider({ children }) {
     localStorage.setItem(STORAGE_RECENT_KEY, JSON.stringify(recentViews));
   }, [recentViews]);
 
-  const addToCart = (product) => {
+  const addToCart = (product, quantity = 1) => {
     setCartItems((previous) => {
       const existing = previous.find((item) => item._id === product._id);
       if (existing) {
         return previous.map((item) =>
-          item._id === product._id ? { ...item, quantity: item.quantity + 1 } : item
+          item._id === product._id ? { ...item, quantity: item.quantity + quantity } : item
         );
       }
 
-      return [...previous, { ...product, quantity: 1 }];
+      return [...previous, { ...product, quantity }];
     });
+  };
+
+  const updateQuantity = (productId, quantity) => {
+    if (quantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+    setCartItems((previous) =>
+      previous.map((item) =>
+        item._id === productId ? { ...item, quantity } : item
+      )
+    );
   };
 
   const removeFromCart = (productId) => {
@@ -80,6 +93,7 @@ export function CartProvider({ children }) {
         totalItems,
         addToCart,
         removeFromCart,
+        updateQuantity,
         clearCart,
         addRecentView,
       }}

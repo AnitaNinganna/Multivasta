@@ -4,7 +4,7 @@ const path = require('path');
 const multer = require('multer');
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
-const Vendor = require('../models/Vendor');
+const User = require('../models/User');
 const Category = require('../models/Category');
 const { authenticate, requireVendor, requireAdmin } = require('../middleware/auth');
 
@@ -35,75 +35,273 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// Get all products (public)
+// Get all products with advanced search - ENHANCED
 router.get('/', async (req, res) => {
-  const { category, vendor, search, min_price, max_price, page = 1, limit = 20 } = req.query;
+  const { 
+    search, 
+    category, 
+    vendor, 
+    minPrice, 
+    maxPrice, 
+    minRating,
+    sortBy = 'newest',
+    page = 1, 
+    limit = 20 
+  } = req.query;
+
   const filter = { isActive: true, isApproved: true };
 
   try {
+    // Category filtering
     if (category) {
-      const categoryQuery = mongoose.isValidObjectId(category)
-        ? { _id: category }
-        : { slug: category.toString().toLowerCase() };
-      const categoryDoc = await Category.findOne(categoryQuery);
-      if (categoryDoc) {
-        filter.categoryId = categoryDoc._id;
-      }
-    }
-
-    if (vendor && mongoose.isValidObjectId(vendor)) {
-      const vendorDoc = await Vendor.findById(vendor);
-      if (vendorDoc) {
-        filter.vendorId = vendorDoc.userId;
+      if (mongoose.isValidObjectId(category)) {
+        filter.categoryId = new mongoose.Types.ObjectId(category);
       } else {
-        filter.vendorId = vendor;
+        const categoryDoc = await Category.findOne({ name: new RegExp(category, 'i') });
+        if (categoryDoc) {
+          filter.categoryId = categoryDoc._id;
+        }
       }
     }
 
+    // Vendor filtering
+    if (vendor) {
+      if (mongoose.isValidObjectId(vendor)) {
+        filter.vendorId = new mongoose.Types.ObjectId(vendor);
+      } else {
+        const vendorUser = await User.findOne({ 
+          'vendorDetails.storeName': new RegExp(vendor, 'i'),
+          role: 'vendor'
+        });
+        if (vendorUser) {
+          filter.vendorId = vendorUser._id;
+        }
+      }
+    }
+
+    // Price range filtering
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      filter.price = {};
+      if (minPrice !== undefined) {
+        filter.price.$gte = Number(minPrice);
+      }
+      if (maxPrice !== undefined) {
+        filter.price.$lte = Number(maxPrice);
+      }
+    }
+
+    // Rating filtering
+    if (minRating !== undefined) {
+      filter.rating = { $gte: Number(minRating) };
+    }
+
+    // Advanced search with full-text search
     if (search) {
-      const regex = new RegExp(search, 'i');
-      const matchingCategories = await Category.find({ name: regex }).select('_id');
-      const matchingVendorUsers = await Vendor.find({ storeName: regex }).select('userId');
-
-      filter.$or = [
-        { name: regex },
-        { description: regex }
-      ];
-
-      if (matchingCategories.length) {
-        filter.$or.push({ categoryId: { $in: matchingCategories.map((item) => item._id) } });
+      const searchRegex = new RegExp(search.trim(), 'i');
+      
+      // Try full-text search first
+      try {
+        filter.$text = { $search: search };
+      } catch {
+        // Fall back to regex search
+        filter.$or = [
+          { name: searchRegex },
+          { description: searchRegex },
+          { tags: searchRegex },
+          { sku: searchRegex }
+        ];
       }
-      if (matchingVendorUsers.length) {
-        filter.$or.push({ vendorId: { $in: matchingVendorUsers.map((item) => item.userId) } });
-      }
     }
 
-    if (min_price !== undefined) {
-      filter.price = { ...filter.price, $gte: Number(min_price) };
+    // Sorting options
+    let sortOptions = { createdAt: -1 };
+    switch (sortBy) {
+      case 'price_low':
+        sortOptions = { price: 1 };
+        break;
+      case 'price_high':
+        sortOptions = { price: -1 };
+        break;
+      case 'rating':
+        sortOptions = { rating: -1, reviewCount: -1 };
+        break;
+      case 'popular':
+        sortOptions = { soldCount: -1 };
+        break;
+      case 'newest':
+      default:
+        sortOptions = { createdAt: -1 };
     }
 
-    if (max_price !== undefined) {
-      filter.price = { ...filter.price, $lte: Number(max_price) };
-    }
+    // Pagination
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.min(100, Math.max(1, Number(limit)));
+    const skip = (pageNum - 1) * limitNum;
 
-    const products = await Product.find(filter)
-      .populate('vendorId', 'name vendorDetails.storeName vendorDetails.commissionRate')
-      .populate('categoryId', 'name')
-      .sort({ createdAt: -1 })
-      .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit));
+    // Execute query
+    const [products, total] = await Promise.all([
+      Product.find(filter)
+        .populate('vendorId', 'name vendorDetails.storeName email')
+        .populate('categoryId', 'name')
+        .select('name description price rating reviewCount soldCount quantity images sku categoryId vendorId tags createdAt')
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limitNum),
+      Product.countDocuments(filter)
+    ]);
 
-    const total = await Product.countDocuments(filter);
-    const totalPages = Math.ceil(total / Number(limit));
+    const totalPages = Math.ceil(total / limitNum);
+
+    // Get faceted data for filters
+    const facets = await getFacets(filter);
 
     res.json({
-      products,
+      products: products.map(p => ({
+        id: p._id,
+        name: p.name,
+        description: p.description,
+        price: p.price,
+        rating: p.rating || 0,
+        reviewCount: p.reviewCount || 0,
+        soldCount: p.soldCount || 0,
+        quantity: p.quantity,
+        images: p.images,
+        sku: p.sku,
+        category: p.categoryId?.name,
+        vendor: {
+          id: p.vendorId._id,
+          name: p.vendorId.vendorDetails?.storeName || p.vendorId.name,
+          email: p.vendorId.email
+        },
+        tags: p.tags
+      })),
       meta: {
         total,
-        page: Number(page),
-        limit: Number(limit),
-        total_pages: totalPages
+        page: pageNum,
+        limit: limitNum,
+        totalPages
+      },
+      facets: facets,
+      appliedFilters: {
+        search: search || null,
+        category: category || null,
+        vendor: vendor || null,
+        priceRange: minPrice || maxPrice ? { min: minPrice, max: maxPrice } : null,
+        minRating: minRating || null,
+        sortBy
       }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Helper function for faceted search
+async function getFacets(baseFilter) {
+  try {
+    const categories = await Category.aggregate([
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: 'categoryId',
+          as: 'products'
+        }
+      },
+      {
+        $match: { 'products': { $exists: true, $not: { $size: 0 } } }
+      },
+      {
+        $project: { name: 1, count: { $size: '$products' } }
+      },
+      {
+        $sort: { count: -1 }
+      },
+      {
+        $limit: 20
+      }
+    ]);
+
+    const priceRanges = await Product.aggregate([
+      { $match: baseFilter },
+      {
+        $group: {
+          _id: null,
+          minPrice: { $min: '$price' },
+          maxPrice: { $max: '$price' }
+        }
+      }
+    ]);
+
+    const vendors = await User.aggregate([
+      { $match: { role: 'vendor', 'vendorDetails.isApproved': true } },
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: 'vendorId',
+          as: 'products'
+        }
+      },
+      {
+        $match: { 'products': { $exists: true, $not: { $size: 0 } } }
+      },
+      {
+        $project: {
+          name: '$vendorDetails.storeName',
+          count: { $size: '$products' }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      },
+      {
+        $limit: 20
+      }
+    ]);
+
+    const ratings = [
+      { rating: 5, label: '5 Stars', count: await Product.countDocuments({ ...baseFilter, rating: 5 }) },
+      { rating: 4, label: '4+ Stars', count: await Product.countDocuments({ ...baseFilter, rating: { $gte: 4 } }) },
+      { rating: 3, label: '3+ Stars', count: await Product.countDocuments({ ...baseFilter, rating: { $gte: 3 } }) }
+    ];
+
+    return {
+      categories: categories,
+      priceRange: priceRanges[0] || { minPrice: 0, maxPrice: 10000 },
+      vendors: vendors,
+      ratings: ratings
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+// Get search suggestions
+router.get('/search/suggestions', async (req, res) => {
+  const { q } = req.query;
+
+  if (!q || q.length < 2) {
+    return res.json({ suggestions: [] });
+  }
+
+  try {
+    const regex = new RegExp(q, 'i');
+    
+    const [productNames, categoryNames] = await Promise.all([
+      Product.find({ name: regex, isActive: true, isApproved: true })
+        .distinct('name')
+        .limit(5),
+      Category.find({ name: regex })
+        .distinct('name')
+        .limit(5)
+    ]);
+
+    res.json({
+      suggestions: [
+        ...productNames.map(name => ({ type: 'product', value: name })),
+        ...categoryNames.map(name => ({ type: 'category', value: name }))
+      ]
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -127,11 +325,6 @@ router.post('/upload', authenticate, requireVendor, upload.array('images', 6), a
 // Get current vendor products (vendor only)
 router.get('/mine', authenticate, requireVendor, async (req, res) => {
   try {
-    const vendor = await Vendor.findOne({ userId: req.userId });
-    if (!vendor) {
-      return res.status(404).json({ error: 'Vendor profile not found' });
-    }
-
     const products = await Product.find({ vendorId: req.userId })
       .populate('categoryId', 'name')
       .sort({ createdAt: -1 });
@@ -167,15 +360,15 @@ router.get('/:id', async (req, res) => {
 
 // Create product (vendor only)
 router.post('/', authenticate, requireVendor, async (req, res) => {
-  const { name, description, price, sku, quantity, images, attributes, category_id } = req.body;
+  const { name, description, price, sku, quantity, images, attributes, category_id, tags = [] } = req.body;
 
   if (!name || price === undefined) {
     return res.status(400).json({ error: 'Product name and price are required' });
   }
 
   try {
-    const vendor = await Vendor.findOne({ userId: req.userId });
-    if (!vendor) {
+    const user = await User.findById(req.userId);
+    if (!user || user.role !== 'vendor') {
       return res.status(404).json({ error: 'Vendor profile not found' });
     }
 
@@ -190,6 +383,7 @@ router.post('/', authenticate, requireVendor, async (req, res) => {
       quantity: quantity || 0,
       images: Array.isArray(images) ? images : [],
       attributes: attributes || {},
+      tags: Array.isArray(tags) ? tags : [],
       categoryId
     });
 
@@ -210,18 +404,13 @@ router.put('/:id', authenticate, requireVendor, async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const vendor = await Vendor.findOne({ userId: req.userId });
-    if (!vendor) {
-      return res.status(404).json({ error: 'Vendor profile not found' });
-    }
-
     const product = await Product.findOne({ _id: id, vendorId: req.userId });
     if (!product) {
       return res.status(404).json({ error: 'Product not found or unauthorized' });
     }
 
     const updateFields = {};
-    ['name', 'description', 'price', 'sku', 'quantity'].forEach(field => {
+    ['name', 'description', 'price', 'sku', 'quantity', 'tags'].forEach(field => {
       if (updates[field] !== undefined) {
         updateFields[field] = updates[field];
       }
@@ -259,15 +448,14 @@ router.delete('/:id', authenticate, requireVendor, async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const vendor = await Vendor.findOne({ userId: req.userId });
-    if (!vendor) {
-      return res.status(404).json({ error: 'Vendor profile not found' });
-    }
-
     const result = await Product.deleteOne({ _id: id, vendorId: req.userId });
     if (result.deletedCount === 0) {
       return res.status(404).json({ error: 'Product not found or unauthorized' });
     }
+
+    // Also delete associated inventory
+    const Inventory = require('../models/Inventory');
+    await Inventory.deleteOne({ productId: id });
 
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {

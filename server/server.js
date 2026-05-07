@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
 const path = require('path');
 
 const app = express();
@@ -23,6 +24,7 @@ const orderRoutes = require('./routes/orders');
 const vendorRoutes = require('./routes/vendors');
 const adminRoutes = require('./routes/admin');
 const reviewRoutes = require('./routes/reviews');
+const categoryRoutes = require('./routes/categories');
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -32,6 +34,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/categories', categoryRoutes);
 
 // Health check endpoints
 app.get('/api/health', (req, res) => {
@@ -42,9 +45,23 @@ app.get('/api/test', (req, res) => {
   res.json({ status: 'OK', message: 'API test route is available', timestamp: new Date().toISOString() });
 });
 
+const clientDistPath = path.join(__dirname, '../frontend/dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
+
 // Fallback for unknown API routes
 app.use((req, res, next) => {
-  res.status(404).json({ error: 'Route not found', path: req.originalUrl });
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'Route not found', path: req.originalUrl });
+  }
+  res.status(404).send('Not Found');
 });
 
 // Error handling middleware
